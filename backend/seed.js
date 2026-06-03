@@ -29,8 +29,26 @@ async function seed() {
       last_called TIMESTAMP,
       follow_up_date DATE,
       created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
       has_website BOOLEAN GENERATED ALWAYS AS (website IS NOT NULL AND website != '') STORED
     )
+  `);
+
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION update_timestamp()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      NEW.updated_at = NOW();
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+  `);
+
+  await pool.query(`
+    DROP TRIGGER IF EXISTS set_updated_at ON leads;
+    CREATE TRIGGER set_updated_at
+    BEFORE UPDATE ON leads
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
   `);
 
   const seedUsers = [
