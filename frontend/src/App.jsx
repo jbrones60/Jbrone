@@ -11,6 +11,7 @@ const STATUSES = ['', 'Not Called', 'Called - No Answer', 'Interested', 'Not Int
 const PRIORITIES = ['high', 'medium', 'low'];
 const STATUS_QUICK = ['Not Called', 'Interested', 'Follow Up', 'Converted'];
 const EMPTY_FILTERS = { search: '', category: '', assigned_to: '', status: '', priority: '', website: '' };
+const VALID_LOST_REASONS = ['Already has website', 'Too expensive', 'Not decision maker', 'Bad timing', 'No interest in digital', 'Other'];
 
 const CATEGORY_COLORS = {
   'schools': '#3b82f6',
@@ -105,6 +106,8 @@ function LeadModal({ lead, onClose, onSave }) {
   const [pitchOpen, setPitchOpen] = useState(false);
   const [logs, setLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(true);
+  const [lostReasonPending, setLostReasonPending] = useState(false);
+  const [pendingLostReason, setPendingLostReason] = useState('');
   const dateRef = useRef(null);
 
   useEffect(() => {
@@ -151,17 +154,27 @@ function LeadModal({ lead, onClose, onSave }) {
       setTimeout(() => dateRef.current?.showPicker?.() ?? dateRef.current?.focus(), 50);
       return;
     }
+    if (type === 'not-interested') {
+      setLostReasonPending(true);
+      return;
+    }
     const map = {
-      'interested':     { status: 'Interested',       follow_up_date: daysFromToday(3) },
-      'no-answer':      { status: 'Called - No Answer', follow_up_date: daysFromToday(1) },
-      'not-interested': { status: 'Not Interested' },
-      'closed':         { status: 'Closed Deal' },
+      'interested': { status: 'Interested',        follow_up_date: daysFromToday(3) },
+      'no-answer':  { status: 'Called - No Answer', follow_up_date: daysFromToday(1) },
+      'closed':     { status: 'Closed Deal' },
     };
     const overrides = map[type];
     if (overrides) {
       const finalData = { ...form, ...overrides };
       await saveAndLog(finalData, { status_set: overrides.status, notes: form.notes });
     }
+  }
+
+  async function confirmNotInterested() {
+    const finalData = { ...form, status: 'Not Interested', lost_reason: pendingLostReason };
+    await saveAndLog(finalData, { status_set: 'Not Interested', notes: form.notes });
+    setLostReasonPending(false);
+    setPendingLostReason('');
   }
 
   const catColor = CATEGORY_COLORS[lead.category] || '#64748b';
@@ -272,13 +285,42 @@ function LeadModal({ lead, onClose, onSave }) {
           {/* Quick Log */}
           <div>
             <div style={s.quickLogLabel}>Quick Log</div>
-            <div style={s.quickLogRow}>
-              <button style={s.quickBtn('#22c55e')} onClick={() => quickLog('interested')} disabled={saving}>✅ Interested</button>
-              <button style={s.quickBtn('#64748b')} onClick={() => quickLog('no-answer')} disabled={saving}>📞 No Answer</button>
-              <button style={s.quickBtn('#3b82f6')} onClick={() => quickLog('callback')} disabled={saving}>💬 Call Back</button>
-              <button style={s.quickBtn('#f87171')} onClick={() => quickLog('not-interested')} disabled={saving}>❌ Not Interested</button>
-              <button style={s.quickBtn('#a855f7')} onClick={() => quickLog('closed')} disabled={saving}>🌐 Has Website</button>
-            </div>
+            {lostReasonPending ? (
+              <div style={{ background: '#0d1117', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, padding: '12px 14px' }}>
+                <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#f87171', marginBottom: 8 }}>Why not interested?</div>
+                <select
+                  value={pendingLostReason}
+                  onChange={e => setPendingLostReason(e.target.value)}
+                  style={{ ...s.mSelect, marginBottom: 10 }}
+                >
+                  <option value="">Select reason…</option>
+                  {VALID_LOST_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    style={{ ...s.saveBtn, background: '#f87171', fontSize: 12, padding: '6px 14px' }}
+                    onClick={confirmNotInterested}
+                    disabled={!pendingLostReason || saving}
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    style={{ ...s.cancelBtn, fontSize: 12, padding: '6px 14px' }}
+                    onClick={() => { setLostReasonPending(false); setPendingLostReason(''); }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={s.quickLogRow}>
+                <button style={s.quickBtn('#22c55e')} onClick={() => quickLog('interested')} disabled={saving}>✅ Interested</button>
+                <button style={s.quickBtn('#64748b')} onClick={() => quickLog('no-answer')} disabled={saving}>📞 No Answer</button>
+                <button style={s.quickBtn('#3b82f6')} onClick={() => quickLog('callback')} disabled={saving}>💬 Call Back</button>
+                <button style={s.quickBtn('#f87171')} onClick={() => quickLog('not-interested')} disabled={saving}>❌ Not Interested</button>
+                <button style={s.quickBtn('#a855f7')} onClick={() => quickLog('closed')} disabled={saving}>🌐 Has Website</button>
+              </div>
+            )}
           </div>
 
           <div style={s.btnRow}>

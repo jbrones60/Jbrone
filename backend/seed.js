@@ -30,6 +30,7 @@ async function seed() {
       follow_up_date DATE,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
+      lost_reason TEXT DEFAULT NULL,
       has_website BOOLEAN GENERATED ALWAYS AS (website IS NOT NULL AND website != '') STORED
     )
   `);

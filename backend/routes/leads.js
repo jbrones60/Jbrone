@@ -6,6 +6,7 @@ const router = express.Router();
 
 const VALID_STATUSES = ['Not Called', 'Called - No Answer', 'Interested', 'Not Interested', 'Follow Up', 'Converted', 'Closed Deal'];
 const VALID_PRIORITIES = ['high', 'medium', 'low'];
+const VALID_LOST_REASONS = ['Already has website', 'Too expensive', 'Not decision maker', 'Bad timing', 'No interest in digital', 'Other'];
 
 function normalisePhone(phone) {
   if (!phone) return null;
@@ -27,7 +28,7 @@ function auth(req, res, next) {
 
 router.get('/stats', auth, async (req, res) => {
   try {
-    const [byStatus, byMember, byCategory] = await Promise.all([
+    const [byStatus, byMember, byCategory, byLostReason] = await Promise.all([
       pool.query('SELECT status, COUNT(*) AS count FROM leads GROUP BY status'),
       pool.query(`
         SELECT assigned_to,
@@ -42,8 +43,13 @@ router.get('/stats', auth, async (req, res) => {
           COUNT(*) FILTER (WHERE status != 'Not Called') AS called
         FROM leads GROUP BY category
       `),
+      pool.query(`
+        SELECT lost_reason, COUNT(*) AS count
+        FROM leads WHERE lost_reason IS NOT NULL
+        GROUP BY lost_reason ORDER BY count DESC
+      `),
     ]);
-    res.json({ byStatus: byStatus.rows, byMember: byMember.rows, byCategory: byCategory.rows });
+    res.json({ byStatus: byStatus.rows, byMember: byMember.rows, byCategory: byCategory.rows, byLostReason: byLostReason.rows });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -134,12 +140,14 @@ router.get('/backup', auth, async (req, res) => {
 
 router.patch('/:id', auth, async (req, res) => {
   const { id } = req.params;
-  const { status, assigned_to, priority, notes, follow_up_date } = req.body;
+  const { status, assigned_to, priority, notes, follow_up_date, lost_reason } = req.body;
 
   if (status !== undefined && !VALID_STATUSES.includes(status))
     return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
   if (priority !== undefined && !VALID_PRIORITIES.includes(priority))
     return res.status(400).json({ error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}` });
+  if (lost_reason != null && !VALID_LOST_REASONS.includes(lost_reason))
+    return res.status(400).json({ error: `Invalid lost_reason. Must be one of: ${VALID_LOST_REASONS.join(', ')}` });
 
   try {
     const { rows } = await pool.query(
@@ -149,9 +157,10 @@ router.patch('/:id', auth, async (req, res) => {
         priority = COALESCE($3, priority),
         notes = COALESCE($4, notes),
         follow_up_date = COALESCE($5, follow_up_date),
+        lost_reason = COALESCE($7, lost_reason),
         last_called = NOW()
       WHERE id = $6 RETURNING *`,
-      [status, assigned_to, priority, notes, follow_up_date || null, id]
+      [status, assigned_to, priority, notes, follow_up_date || null, id, lost_reason ?? null]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Lead not found' });
     res.json(rows[0]);
