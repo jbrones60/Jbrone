@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Login from './pages/Login';
 import Table from './components/Table';
 import Kanban from './components/Kanban';
@@ -44,6 +44,9 @@ const s = {
   btnRow: { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 },
   saveBtn: { background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 22px', fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
   cancelBtn: { background: 'none', color: '#64748b', border: '1px solid #1e293b', borderRadius: 8, padding: '9px 22px', fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, cursor: 'pointer' },
+  quickLogRow: { display: 'flex', gap: 6, flexWrap: 'wrap' },
+  quickBtn: (color) => ({ background: color + '18', color, border: `1px solid ${color}33`, borderRadius: 8, padding: '6px 11px', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, whiteSpace: 'nowrap' }),
+  quickLogLabel: { fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#475569', marginBottom: 6 },
 };
 
 function LeadModal({ lead, onClose, onSave }) {
@@ -55,6 +58,7 @@ function LeadModal({ lead, onClose, onSave }) {
   });
   const [saving, setSaving] = useState(false);
   const [visible, setVisible] = useState(false);
+  const dateRef = useRef(null);
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
@@ -62,11 +66,30 @@ function LeadModal({ lead, onClose, onSave }) {
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
-  async function save() {
+  function daysFromToday(n) {
+    return new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  }
+
+  async function save(overrides) {
     setSaving(true);
-    try { await onSave(lead.id, form); onClose(); }
+    try { await onSave(lead.id, { ...form, ...overrides }); onClose(); }
     catch (e) { console.error(e); }
     finally { setSaving(false); }
+  }
+
+  async function quickLog(type) {
+    if (type === 'interested') {
+      await save({ status: 'Interested', follow_up_date: daysFromToday(3) });
+    } else if (type === 'no-answer') {
+      await save({ status: 'Called - No Answer', follow_up_date: daysFromToday(1) });
+    } else if (type === 'callback') {
+      setForm(f => ({ ...f, status: 'Follow Up' }));
+      setTimeout(() => dateRef.current?.showPicker?.() ?? dateRef.current?.focus(), 50);
+    } else if (type === 'not-interested') {
+      await save({ status: 'Not Interested' });
+    } else if (type === 'closed') {
+      await save({ status: 'Closed Deal' });
+    }
   }
 
   const catColor = CATEGORY_COLORS[lead.category] || '#64748b';
@@ -154,7 +177,7 @@ function LeadModal({ lead, onClose, onSave }) {
 
           <div>
             <label style={s.label}>Follow-up Date</label>
-            <input style={s.mInput} type="date" value={form.follow_up_date} onChange={e => set('follow_up_date', e.target.value)} />
+            <input ref={dateRef} style={s.mInput} type="date" value={form.follow_up_date} onChange={e => set('follow_up_date', e.target.value)} />
           </div>
 
           <div style={{ flex: 1 }}>
@@ -162,9 +185,20 @@ function LeadModal({ lead, onClose, onSave }) {
             <textarea style={{ ...s.textarea, minHeight: 130 }} value={form.notes} onChange={e => set('notes', e.target.value)} />
           </div>
 
+          <div>
+            <div style={s.quickLogLabel}>Quick Log</div>
+            <div style={s.quickLogRow}>
+              <button style={s.quickBtn('#22c55e')} onClick={() => quickLog('interested')} disabled={saving}>✅ Interested</button>
+              <button style={s.quickBtn('#64748b')} onClick={() => quickLog('no-answer')} disabled={saving}>📞 No Answer</button>
+              <button style={s.quickBtn('#3b82f6')} onClick={() => quickLog('callback')} disabled={saving}>💬 Call Back</button>
+              <button style={s.quickBtn('#f87171')} onClick={() => quickLog('not-interested')} disabled={saving}>❌ Not Interested</button>
+              <button style={s.quickBtn('#a855f7')} onClick={() => quickLog('closed')} disabled={saving}>🌐 Has Website</button>
+            </div>
+          </div>
+
           <div style={s.btnRow}>
             <button style={s.cancelBtn} onClick={onClose}>Cancel</button>
-            <button style={s.saveBtn} onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+            <button style={s.saveBtn} onClick={() => save({})} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button>
           </div>
         </div>
       </div>
