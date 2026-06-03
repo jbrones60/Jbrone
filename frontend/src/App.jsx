@@ -3,7 +3,7 @@ import Login from './pages/Login';
 import Table from './components/Table';
 import Kanban from './components/Kanban';
 import Stats from './components/Stats';
-import { getLeads, updateLead, exportBackup } from './api';
+import { getLeads, updateLead, exportBackup, addCallLog, getCallLogs } from './api';
 
 const CATEGORIES = ['schools', 'Real Estate', 'interior designs', 'law', 'CA'];
 const MEMBERS = ['', 'Ravi', 'Priya', 'Suresh'];
@@ -11,6 +11,24 @@ const STATUSES = ['', 'Not Called', 'Called - No Answer', 'Interested', 'Not Int
 const PRIORITIES = ['high', 'medium', 'low'];
 const STATUS_QUICK = ['Not Called', 'Interested', 'Follow Up', 'Converted'];
 const EMPTY_FILTERS = { search: '', category: '', assigned_to: '', status: '', priority: '', website: '' };
+
+const CATEGORY_COLORS = {
+  'schools': '#3b82f6',
+  'Real Estate': '#22c55e',
+  'interior designs': '#a855f7',
+  'law': '#f59e0b',
+  'CA': '#ef4444',
+};
+
+const STATUS_COLORS = {
+  'Not Called': '#64748b',
+  'Called - No Answer': '#94a3b8',
+  'Interested': '#22c55e',
+  'Not Interested': '#f87171',
+  'Follow Up': '#3b82f6',
+  'Converted': '#a855f7',
+  'Closed Deal': '#f59e0b',
+};
 
 const SCRIPTS = {
   'schools': "Hi, am I speaking with the principal or the person who handles admissions?\n\nHi [name], I'm calling from our agency in Vijayawada. We build websites for schools — I noticed your school doesn't have one online yet. I have 2 minutes — can I quickly show you what we did for a school similar to yours?",
@@ -28,13 +46,17 @@ const PITCH_NOTES = {
   'law': "Ask what type of cases they handle. Mention local SEO — people search 'lawyer in Vijayawada'. Highlight consultation booking page. Keep pitch short — lawyers are busy.",
 };
 
-const CATEGORY_COLORS = {
-  'schools': '#3b82f6',
-  'Real Estate': '#22c55e',
-  'interior designs': '#a855f7',
-  'law': '#f59e0b',
-  'CA': '#ef4444',
-};
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr);
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
 
 const s = {
   app: { minHeight: '100vh', background: '#080c14', color: '#f1f5f9' },
@@ -81,11 +103,17 @@ function LeadModal({ lead, onClose, onSave }) {
   const [visible, setVisible] = useState(false);
   const [scriptOpen, setScriptOpen] = useState(false);
   const [pitchOpen, setPitchOpen] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(true);
   const dateRef = useRef(null);
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
-  }, []);
+    getCallLogs(lead.id)
+      .then(setLogs)
+      .catch(console.error)
+      .finally(() => setLogsLoading(false));
+  }, [lead.id]);
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
@@ -93,25 +121,46 @@ function LeadModal({ lead, onClose, onSave }) {
     return new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
   }
 
-  async function save(overrides) {
+  async function saveAndLog(data, logEntry) {
     setSaving(true);
-    try { await onSave(lead.id, { ...form, ...overrides }); onClose(); }
-    catch (e) { console.error(e); }
-    finally { setSaving(false); }
+    try {
+      await onSave(lead.id, data);
+      if (logEntry) {
+        const newLog = await addCallLog(lead.id, logEntry).catch(() => null);
+        if (newLog) setLogs(ls => [newLog, ...ls]);
+      }
+      onClose();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function save(overrides = {}) {
+    const finalData = { ...form, ...overrides };
+    const logEntry = finalData.status !== lead.status
+      ? { status_set: finalData.status, notes: finalData.notes }
+      : null;
+    return saveAndLog(finalData, logEntry);
   }
 
   async function quickLog(type) {
-    if (type === 'interested') {
-      await save({ status: 'Interested', follow_up_date: daysFromToday(3) });
-    } else if (type === 'no-answer') {
-      await save({ status: 'Called - No Answer', follow_up_date: daysFromToday(1) });
-    } else if (type === 'callback') {
+    if (type === 'callback') {
       setForm(f => ({ ...f, status: 'Follow Up' }));
       setTimeout(() => dateRef.current?.showPicker?.() ?? dateRef.current?.focus(), 50);
-    } else if (type === 'not-interested') {
-      await save({ status: 'Not Interested' });
-    } else if (type === 'closed') {
-      await save({ status: 'Closed Deal' });
+      return;
+    }
+    const map = {
+      'interested':     { status: 'Interested',       follow_up_date: daysFromToday(3) },
+      'no-answer':      { status: 'Called - No Answer', follow_up_date: daysFromToday(1) },
+      'not-interested': { status: 'Not Interested' },
+      'closed':         { status: 'Closed Deal' },
+    };
+    const overrides = map[type];
+    if (overrides) {
+      const finalData = { ...form, ...overrides };
+      await saveAndLog(finalData, { status_set: overrides.status, notes: form.notes });
     }
   }
 
@@ -120,10 +169,7 @@ function LeadModal({ lead, onClose, onSave }) {
 
   return (
     <>
-      <div
-        onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 99 }}
-      />
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 99 }} />
       <div style={{
         position: 'fixed', top: 0, right: 0, height: '100vh', width: 520,
         background: '#111827', borderLeft: '1px solid #1e293b',
@@ -148,14 +194,10 @@ function LeadModal({ lead, onClose, onSave }) {
 
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 9 }}>
             <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 13 }}>
-              <a href={`tel:${lead.phone}`} style={{ color: '#3b82f6', textDecoration: 'none' }}>
-                📞 {lead.phone}
-              </a>
+              <a href={`tel:${lead.phone}`} style={{ color: '#3b82f6', textDecoration: 'none' }}>📞 {lead.phone}</a>
             </div>
             {lead.address && (
-              <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#64748b' }}>
-                📍 {lead.address}
-              </div>
+              <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#64748b' }}>📍 {lead.address}</div>
             )}
             {lead.has_website && websiteUrl && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -164,8 +206,7 @@ function LeadModal({ lead, onClose, onSave }) {
                 </a>
                 <a
                   href={`https://pagespeed.web.dev/analysis?url=${encodeURIComponent(websiteUrl)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  target="_blank" rel="noopener noreferrer"
                   style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#f59e0b', textDecoration: 'none', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 4, padding: '2px 8px', whiteSpace: 'nowrap' }}
                 >
                   Check Site Score →
@@ -181,7 +222,7 @@ function LeadModal({ lead, onClose, onSave }) {
           </div>
         </div>
 
-        {/* Bottom: editable fields */}
+        {/* Bottom: editable + timeline */}
         <div style={{ padding: '20px 28px', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {/* Opening Script panel */}
@@ -190,9 +231,7 @@ function LeadModal({ lead, onClose, onSave }) {
               <span style={s.collapseTitle}>Opening Script</span>
               <span style={s.collapseChevron(scriptOpen)}>▶</span>
             </div>
-            {scriptOpen && (
-              <div style={s.collapseBody}>{SCRIPTS[lead.category] || 'No script available for this category.'}</div>
-            )}
+            {scriptOpen && <div style={s.collapseBody}>{SCRIPTS[lead.category] || 'No script available for this category.'}</div>}
           </div>
 
           {/* Pitch Notes panel */}
@@ -201,11 +240,10 @@ function LeadModal({ lead, onClose, onSave }) {
               <span style={s.collapseTitle}>Pitch Notes</span>
               <span style={s.collapseChevron(pitchOpen)}>▶</span>
             </div>
-            {pitchOpen && (
-              <div style={s.collapseBody}>{PITCH_NOTES[lead.category] || 'No pitch notes for this category.'}</div>
-            )}
+            {pitchOpen && <div style={s.collapseBody}>{PITCH_NOTES[lead.category] || 'No pitch notes for this category.'}</div>}
           </div>
 
+          {/* Editable fields */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={s.label}>Status</label>
@@ -226,11 +264,12 @@ function LeadModal({ lead, onClose, onSave }) {
             <input ref={dateRef} style={s.mInput} type="date" value={form.follow_up_date} onChange={e => set('follow_up_date', e.target.value)} />
           </div>
 
-          <div style={{ flex: 1 }}>
+          <div>
             <label style={s.label}>Notes</label>
-            <textarea style={{ ...s.textarea, minHeight: 130 }} value={form.notes} onChange={e => set('notes', e.target.value)} />
+            <textarea style={{ ...s.textarea, minHeight: 90 }} value={form.notes} onChange={e => set('notes', e.target.value)} />
           </div>
 
+          {/* Quick Log */}
           <div>
             <div style={s.quickLogLabel}>Quick Log</div>
             <div style={s.quickLogRow}>
@@ -244,8 +283,46 @@ function LeadModal({ lead, onClose, onSave }) {
 
           <div style={s.btnRow}>
             <button style={s.cancelBtn} onClick={onClose}>Cancel</button>
-            <button style={s.saveBtn} onClick={() => save({})} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button>
+            <button style={s.saveBtn} onClick={() => save()} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button>
           </div>
+
+          {/* Call Log Timeline */}
+          <div style={{ borderTop: '1px solid #1e293b', paddingTop: 16 }}>
+            <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#475569', marginBottom: 12, letterSpacing: '0.04em' }}>Call History</div>
+            {logsLoading ? (
+              <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#475569' }}>Loading…</div>
+            ) : logs.length === 0 ? (
+              <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#334155' }}>No calls logged yet</div>
+            ) : (
+              <div style={{ position: 'relative', paddingLeft: 22 }}>
+                {/* Vertical line */}
+                <div style={{ position: 'absolute', left: 6, top: 6, bottom: 6, width: 1, background: '#1e293b' }} />
+                {logs.map(log => {
+                  const dotColor = STATUS_COLORS[log.status_set] || '#334155';
+                  return (
+                    <div key={log.id} style={{ position: 'relative', marginBottom: 14 }}>
+                      {/* Dot */}
+                      <div style={{ position: 'absolute', left: -22, top: 4, width: 8, height: 8, borderRadius: '50%', background: dotColor, border: '2px solid #111827', boxSizing: 'border-box' }} />
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 3 }}>
+                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#475569' }}>{timeAgo(log.created_at)}</span>
+                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#334155' }}>·</span>
+                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#64748b' }}>{log.logged_by}</span>
+                        {log.status_set && (
+                          <span style={{ background: dotColor + '20', color: dotColor, border: `1px solid ${dotColor}33`, borderRadius: 10, padding: '1px 8px', fontFamily: 'DM Mono, monospace', fontSize: 11 }}>
+                            {log.status_set}
+                          </span>
+                        )}
+                      </div>
+                      {log.notes && (
+                        <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>{log.notes}</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     </>
@@ -323,11 +400,7 @@ export default function App() {
 
           <div style={s.filterRow}>
             {STATUS_QUICK.map(st => (
-              <button
-                key={st}
-                style={s.quickPill(filters.status === st)}
-                onClick={() => setFilter('status', filters.status === st ? '' : st)}
-              >
+              <button key={st} style={s.quickPill(filters.status === st)} onClick={() => setFilter('status', filters.status === st ? '' : st)}>
                 {st}
               </button>
             ))}
@@ -335,10 +408,7 @@ export default function App() {
 
           <div style={s.filterRow}>
             {filters.category ? (
-              <span style={s.chip}>
-                Category: {filters.category}
-                <button style={s.chipRemove} onClick={() => setFilter('category', '')}>✕</button>
-              </span>
+              <span style={s.chip}>Category: {filters.category}<button style={s.chipRemove} onClick={() => setFilter('category', '')}>✕</button></span>
             ) : (
               <select style={s.filterSelect} value="" onChange={e => e.target.value && setFilter('category', e.target.value)}>
                 <option value="">Category</option>
@@ -347,10 +417,7 @@ export default function App() {
             )}
 
             {filters.priority ? (
-              <span style={s.chip}>
-                Priority: {filters.priority}
-                <button style={s.chipRemove} onClick={() => setFilter('priority', '')}>✕</button>
-              </span>
+              <span style={s.chip}>Priority: {filters.priority}<button style={s.chipRemove} onClick={() => setFilter('priority', '')}>✕</button></span>
             ) : (
               <select style={s.filterSelect} value="" onChange={e => e.target.value && setFilter('priority', e.target.value)}>
                 <option value="">Priority</option>
@@ -359,10 +426,7 @@ export default function App() {
             )}
 
             {filters.website ? (
-              <span style={s.chip}>
-                {filters.website === 'has' ? 'Has Website' : 'No Website'}
-                <button style={s.chipRemove} onClick={() => setFilter('website', '')}>✕</button>
-              </span>
+              <span style={s.chip}>{filters.website === 'has' ? 'Has Website' : 'No Website'}<button style={s.chipRemove} onClick={() => setFilter('website', '')}>✕</button></span>
             ) : (
               <select style={s.filterSelect} value="" onChange={e => e.target.value && setFilter('website', e.target.value)}>
                 <option value="">Website</option>
@@ -372,10 +436,7 @@ export default function App() {
             )}
 
             {filters.status && !STATUS_QUICK.includes(filters.status) && (
-              <span style={s.chip}>
-                Status: {filters.status}
-                <button style={s.chipRemove} onClick={() => setFilter('status', '')}>✕</button>
-              </span>
+              <span style={s.chip}>Status: {filters.status}<button style={s.chipRemove} onClick={() => setFilter('status', '')}>✕</button></span>
             )}
           </div>
         </div>
