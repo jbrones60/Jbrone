@@ -24,6 +24,18 @@ export async function getStats() {
   return res.json();
 }
 
+export async function exportBackup() {
+  const res = await fetch(`${BASE}/api/v1/leads/backup`, { headers: headers() });
+  if (!res.ok) throw new Error('Failed to export backup');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `leads-backup-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function updateLead(id, data) {
   const res = await fetch(`${BASE}/api/v1/leads/${id}`, { method: 'PATCH', headers: headers(), body: JSON.stringify(data) });
   if (!res.ok) throw new Error('Failed to update lead');

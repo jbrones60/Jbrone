@@ -3,7 +3,7 @@ import Login from './pages/Login';
 import Table from './components/Table';
 import Kanban from './components/Kanban';
 import Stats from './components/Stats';
-import { getLeads, updateLead } from './api';
+import { getLeads, updateLead, exportBackup } from './api';
 
 const CATEGORIES = ['', 'schools', 'Real Estate', 'interior designs', 'law', 'CA'];
 const MEMBERS = ['', 'Ravi', 'Priya', 'Suresh'];
@@ -16,6 +16,7 @@ const s = {
   logo: { fontFamily: 'Space Grotesk, sans-serif', fontSize: 18, fontWeight: 700, color: '#f1f5f9' },
   user: { fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#64748b' },
   logoutBtn: { background: 'none', border: '1px solid #1e293b', color: '#64748b', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, marginLeft: 12 },
+  backupBtn: { background: 'none', border: '1px solid #1e293b', color: '#3b82f6', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, marginLeft: 12 },
   tabs: { display: 'flex', gap: 0, borderBottom: '1px solid #1e293b', background: '#111827' },
   tab: (active) => ({ padding: '12px 24px', fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, fontWeight: 500, cursor: 'pointer', background: 'none', border: 'none', color: active ? '#3b82f6' : '#64748b', borderBottom: active ? '2px solid #3b82f6' : '2px solid transparent' }),
   filterBar: { display: 'flex', gap: 10, padding: '12px 24px', flexWrap: 'wrap', borderBottom: '1px solid #1e293b', background: '#0d1117' },
@@ -143,6 +144,7 @@ export default function App() {
         <div style={s.logo}>Agency CRM</div>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <span style={s.user}>{user.name}</span>
+          <button style={s.backupBtn} onClick={() => exportBackup().catch(console.error)}>Download Backup</button>
           <button style={s.logoutBtn} onClick={handleLogout}>Logout</button>
         </div>
       </div>

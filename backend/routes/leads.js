@@ -82,6 +82,28 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+router.get('/backup', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM leads ORDER BY id');
+    if (!rows.length) return res.status(204).end();
+
+    const cols = Object.keys(rows[0]);
+    const escape = (v) => {
+      if (v === null || v === undefined) return '';
+      const s = String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [cols.join(','), ...rows.map(r => cols.map(c => escape(r[c])).join(','))].join('\n');
+
+    const date = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="leads-backup-${date}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.patch('/:id', auth, async (req, res) => {
   const { id } = req.params;
   const { status, assigned_to, priority, notes, follow_up_date } = req.body;
