@@ -5,10 +5,12 @@ import Kanban from './components/Kanban';
 import Stats from './components/Stats';
 import { getLeads, updateLead, exportBackup } from './api';
 
-const CATEGORIES = ['', 'schools', 'Real Estate', 'interior designs', 'law', 'CA'];
+const CATEGORIES = ['schools', 'Real Estate', 'interior designs', 'law', 'CA'];
 const MEMBERS = ['', 'Ravi', 'Priya', 'Suresh'];
 const STATUSES = ['', 'Not Called', 'Called - No Answer', 'Interested', 'Not Interested', 'Follow Up', 'Converted', 'Closed Deal'];
-const PRIORITIES = ['', 'high', 'medium', 'low'];
+const PRIORITIES = ['high', 'medium', 'low'];
+const STATUS_QUICK = ['Not Called', 'Interested', 'Follow Up', 'Converted'];
+const EMPTY_FILTERS = { search: '', category: '', assigned_to: '', status: '', priority: '', website: '' };
 
 const s = {
   app: { minHeight: '100vh', background: '#080c14', color: '#f1f5f9' },
@@ -19,9 +21,14 @@ const s = {
   backupBtn: { background: 'none', border: '1px solid #1e293b', color: '#3b82f6', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, marginLeft: 12 },
   tabs: { display: 'flex', gap: 0, borderBottom: '1px solid #1e293b', background: '#111827' },
   tab: (active) => ({ padding: '12px 24px', fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, fontWeight: 500, cursor: 'pointer', background: 'none', border: 'none', color: active ? '#3b82f6' : '#64748b', borderBottom: active ? '2px solid #3b82f6' : '2px solid transparent' }),
-  filterBar: { display: 'flex', gap: 10, padding: '12px 24px', flexWrap: 'wrap', borderBottom: '1px solid #1e293b', background: '#0d1117' },
-  input: { background: '#111827', border: '1px solid #1e293b', color: '#f1f5f9', borderRadius: 8, padding: '7px 12px', fontFamily: 'DM Mono, monospace', fontSize: 13, width: 180 },
-  select: { background: '#111827', border: '1px solid #1e293b', color: '#f1f5f9', borderRadius: 8, padding: '7px 10px', fontFamily: 'DM Mono, monospace', fontSize: 13 },
+  filterBar: { display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 24px', borderBottom: '1px solid #1e293b', background: '#0d1117' },
+  filterRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
+  searchInput: { background: '#111827', border: '1px solid #1e293b', color: '#f1f5f9', borderRadius: 20, padding: '6px 14px', fontFamily: 'DM Mono, monospace', fontSize: 13, width: 220, outline: 'none' },
+  quickPill: (active) => ({ background: active ? '#3b82f6' : '#111827', color: active ? '#fff' : '#64748b', border: `1px solid ${active ? '#3b82f6' : '#1e293b'}`, borderRadius: 20, padding: '4px 14px', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, whiteSpace: 'nowrap' }),
+  filterSelect: { background: '#111827', border: '1px solid #1e293b', color: '#64748b', borderRadius: 20, padding: '4px 12px', fontFamily: 'DM Mono, monospace', fontSize: 12, cursor: 'pointer' },
+  chip: { display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 20, padding: '3px 10px', fontFamily: 'DM Mono, monospace', fontSize: 12 },
+  chipRemove: { background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: 1 },
+  clearAll: { background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, textDecoration: 'underline', padding: 0 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
   modal: { background: '#111827', border: '1px solid #1e293b', borderRadius: 12, padding: 28, width: 480, maxHeight: '90vh', overflowY: 'auto' },
   modalTitle: { fontFamily: 'Space Grotesk, sans-serif', fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 4 },
@@ -84,7 +91,7 @@ function LeadModal({ lead, onClose, onSave }) {
         <div style={s.fieldRow}>
           <label style={s.label}>Priority</label>
           <select style={s.mSelect} value={form.priority} onChange={e => set('priority', e.target.value)}>
-            {PRIORITIES.filter(Boolean).map(p => <option key={p}>{p}</option>)}
+            {PRIORITIES.map(p => <option key={p}>{p}</option>)}
           </select>
         </div>
         <div style={s.fieldRow}>
@@ -108,15 +115,19 @@ export default function App() {
   const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem('user')); } catch { return null; } });
   const [tab, setTab] = useState('Table');
   const [leads, setLeads] = useState([]);
-  const [filters, setFilters] = useState({ search: '', category: '', assigned_to: '', status: '', priority: '', website: '' });
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedLead, setSelectedLead] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const hasActiveFilters = Object.values(filters).some(Boolean);
 
   useEffect(() => {
     if (!user) return;
     setLoading(true);
     getLeads(Object.fromEntries(Object.entries(filters).filter(([, v]) => v)))
-      .then(setLeads).catch(console.error).finally(() => setLoading(false));
+      .then(data => setLeads(data.leads ?? data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [user, filters]);
 
   function setFilter(k, v) { setFilters(f => ({ ...f, [k]: v })); }
@@ -148,37 +159,91 @@ export default function App() {
           <button style={s.logoutBtn} onClick={handleLogout}>Logout</button>
         </div>
       </div>
+
       <div style={s.tabs}>
         {['Table', 'Kanban', 'Stats'].map(t => (
           <button key={t} style={s.tab(tab === t)} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>
+
       {tab !== 'Stats' && (
         <div style={s.filterBar}>
-          <input style={s.input} placeholder="Search name or phone…" value={filters.search} onChange={e => setFilter('search', e.target.value)} />
-          <select style={s.select} value={filters.category} onChange={e => setFilter('category', e.target.value)}>
-            <option value="">All Categories</option>
-            {CATEGORIES.filter(Boolean).map(c => <option key={c}>{c}</option>)}
-          </select>
-          <select style={s.select} value={filters.assigned_to} onChange={e => setFilter('assigned_to', e.target.value)}>
-            <option value="">All Members</option>
-            {MEMBERS.filter(Boolean).map(m => <option key={m}>{m}</option>)}
-          </select>
-          <select style={s.select} value={filters.status} onChange={e => setFilter('status', e.target.value)}>
-            <option value="">All Statuses</option>
-            {STATUSES.filter(Boolean).map(st => <option key={st}>{st}</option>)}
-          </select>
-          <select style={s.select} value={filters.priority} onChange={e => setFilter('priority', e.target.value)}>
-            <option value="">All Priorities</option>
-            {PRIORITIES.filter(Boolean).map(p => <option key={p}>{p}</option>)}
-          </select>
-          <select style={s.select} value={filters.website} onChange={e => setFilter('website', e.target.value)}>
-            <option value="">All Websites</option>
-            <option value="has">Has Website</option>
-            <option value="none">No Website</option>
-          </select>
+          {/* Row 1: Search + Clear All */}
+          <div style={s.filterRow}>
+            <input
+              style={s.searchInput}
+              placeholder="Search name or phone…"
+              value={filters.search}
+              onChange={e => setFilter('search', e.target.value)}
+            />
+            {hasActiveFilters && (
+              <button style={s.clearAll} onClick={() => setFilters(EMPTY_FILTERS)}>Clear All</button>
+            )}
+          </div>
+
+          {/* Row 2: Status quick-filter pills */}
+          <div style={s.filterRow}>
+            {STATUS_QUICK.map(st => (
+              <button
+                key={st}
+                style={s.quickPill(filters.status === st)}
+                onClick={() => setFilter('status', filters.status === st ? '' : st)}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+
+          {/* Row 3: Category / Priority / Website — chip when active, select when not */}
+          <div style={s.filterRow}>
+            {filters.category ? (
+              <span style={s.chip}>
+                Category: {filters.category}
+                <button style={s.chipRemove} onClick={() => setFilter('category', '')}>✕</button>
+              </span>
+            ) : (
+              <select style={s.filterSelect} value="" onChange={e => e.target.value && setFilter('category', e.target.value)}>
+                <option value="">Category</option>
+                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+
+            {filters.priority ? (
+              <span style={s.chip}>
+                Priority: {filters.priority}
+                <button style={s.chipRemove} onClick={() => setFilter('priority', '')}>✕</button>
+              </span>
+            ) : (
+              <select style={s.filterSelect} value="" onChange={e => e.target.value && setFilter('priority', e.target.value)}>
+                <option value="">Priority</option>
+                {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            )}
+
+            {filters.website ? (
+              <span style={s.chip}>
+                {filters.website === 'has' ? 'Has Website' : 'No Website'}
+                <button style={s.chipRemove} onClick={() => setFilter('website', '')}>✕</button>
+              </span>
+            ) : (
+              <select style={s.filterSelect} value="" onChange={e => e.target.value && setFilter('website', e.target.value)}>
+                <option value="">Website</option>
+                <option value="has">Has Website</option>
+                <option value="none">No Website</option>
+              </select>
+            )}
+
+            {/* Chip for statuses set outside the 4 quick pills */}
+            {filters.status && !STATUS_QUICK.includes(filters.status) && (
+              <span style={s.chip}>
+                Status: {filters.status}
+                <button style={s.chipRemove} onClick={() => setFilter('status', '')}>✕</button>
+              </span>
+            )}
+          </div>
         </div>
       )}
+
       {loading && <div style={{ padding: 24, fontFamily: 'DM Mono, monospace', color: '#64748b' }}>Loading…</div>}
       {!loading && tab === 'Table' && <Table leads={leads} onSelectLead={setSelectedLead} onLeadUpdate={handleLeadUpdate} />}
       {!loading && tab === 'Kanban' && <Kanban leads={leads} onSelectLead={setSelectedLead} />}
