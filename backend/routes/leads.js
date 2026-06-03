@@ -4,6 +4,15 @@ const pool = require('../db');
 
 const router = express.Router();
 
+const VALID_STATUSES = ['Not Called', 'Called - No Answer', 'Interested', 'Not Interested', 'Follow Up', 'Converted', 'Closed Deal'];
+const VALID_PRIORITIES = ['high', 'medium', 'low'];
+
+function normalisePhone(phone) {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : null;
+}
+
 function auth(req, res, next) {
   const header = req.headers.authorization;
   if (!header) return res.status(401).json({ error: 'No token' });
@@ -42,6 +51,10 @@ router.get('/stats', auth, async (req, res) => {
 
 router.get('/', auth, async (req, res) => {
   const { category, assigned_to, status, priority, website, search } = req.query;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 30));
+  const offset = (page - 1) * limit;
+
   const conditions = [];
   const values = [];
 
@@ -58,8 +71,12 @@ router.get('/', auth, async (req, res) => {
 
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
   try {
-    const { rows } = await pool.query(`SELECT * FROM leads ${where} ORDER BY id`, values);
-    res.json(rows);
+    const [{ rows }, countResult] = await Promise.all([
+      pool.query(`SELECT * FROM leads ${where} ORDER BY id LIMIT ${limit} OFFSET ${offset}`, values),
+      pool.query(`SELECT COUNT(*) FROM leads ${where}`, values),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ leads: rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -68,6 +85,12 @@ router.get('/', auth, async (req, res) => {
 router.patch('/:id', auth, async (req, res) => {
   const { id } = req.params;
   const { status, assigned_to, priority, notes, follow_up_date } = req.body;
+
+  if (status !== undefined && !VALID_STATUSES.includes(status))
+    return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
+  if (priority !== undefined && !VALID_PRIORITIES.includes(priority))
+    return res.status(400).json({ error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}` });
+
   try {
     const { rows } = await pool.query(
       `UPDATE leads SET

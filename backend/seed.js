@@ -45,6 +45,10 @@ async function seed() {
   `);
 
   await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_leads_status_category ON leads (status, category);
+  `);
+
+  await pool.query(`
     DROP TRIGGER IF EXISTS set_updated_at ON leads;
     CREATE TRIGGER set_updated_at
     BEFORE UPDATE ON leads
