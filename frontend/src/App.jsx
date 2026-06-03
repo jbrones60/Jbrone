@@ -3,7 +3,7 @@ import Login from './pages/Login';
 import Table from './components/Table';
 import Kanban from './components/Kanban';
 import Stats from './components/Stats';
-import { getLeads, updateLead, exportBackup, addCallLog, getCallLogs } from './api';
+import { getLeads, updateLead, exportBackup, addCallLog, getCallLogs, getReengagementLeads } from './api';
 
 const CATEGORIES = ['schools', 'Real Estate', 'interior designs', 'law', 'CA'];
 const MEMBERS = ['', 'Ravi', 'Priya', 'Suresh'];
@@ -378,6 +378,8 @@ export default function App() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedLead, setSelectedLead] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [reengagementLeads, setReengagementLeads] = useState([]);
+  const [reengageLoading, setReengageLoading] = useState(false);
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
 
@@ -390,7 +392,18 @@ export default function App() {
       .finally(() => setLoading(false));
   }, [user, filters]);
 
+  useEffect(() => {
+    if (tab !== 'Re-engage') return;
+    setReengageLoading(true);
+    getReengagementLeads().then(setReengagementLeads).catch(console.error).finally(() => setReengageLoading(false));
+  }, [tab]);
+
   function setFilter(k, v) { setFilters(f => ({ ...f, [k]: v })); }
+
+  async function handleResetAndCall(id) {
+    await updateLead(id, { status: 'Not Called', lost_reason: null, follow_up_date: null });
+    setReengagementLeads(ls => ls.filter(l => l.id !== id));
+  }
 
   function handleLogout() {
     localStorage.removeItem('token');
@@ -421,12 +434,12 @@ export default function App() {
       </div>
 
       <div style={s.tabs}>
-        {['Table', 'Kanban', 'Stats'].map(t => (
+        {['Table', 'Kanban', 'Stats', 'Re-engage'].map(t => (
           <button key={t} style={s.tab(tab === t)} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>
 
-      {tab !== 'Stats' && (
+      {tab !== 'Stats' && tab !== 'Re-engage' && (
         <div style={s.filterBar}>
           <div style={s.filterRow}>
             <input
@@ -488,6 +501,39 @@ export default function App() {
       {!loading && tab === 'Table' && <Table leads={leads} onSelectLead={setSelectedLead} onLeadUpdate={handleLeadUpdate} />}
       {!loading && tab === 'Kanban' && <Kanban leads={leads} onSelectLead={setSelectedLead} />}
       {tab === 'Stats' && <Stats />}
+      {tab === 'Re-engage' && (
+        <div style={{ padding: '24px 28px' }}>
+          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, fontWeight: 600, color: '#f1f5f9', marginBottom: 4 }}>Re-engagement Queue</div>
+          <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#475569', marginBottom: 18 }}>Leads marked Not Interested 60+ days ago</div>
+          {reengageLoading ? (
+            <div style={{ fontFamily: 'DM Mono, monospace', color: '#475569', fontSize: 13 }}>Loading…</div>
+          ) : reengagementLeads.length === 0 ? (
+            <div style={{ fontFamily: 'DM Mono, monospace', color: '#334155', fontSize: 13 }}>No leads in re-engagement queue</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {reengagementLeads.map(lead => (
+                <div key={lead.id} style={{ background: '#111827', border: '1px solid #1e293b', borderRadius: 8, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, color: '#f1f5f9', fontSize: 14, marginBottom: 5 }}>{lead.name}</div>
+                    <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#64748b', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      <span>{lead.category}</span>
+                      <a href={`tel:${lead.phone}`} style={{ color: '#3b82f6', textDecoration: 'none' }}>{lead.phone}</a>
+                      {lead.lost_reason && <span style={{ color: '#f87171' }}>"{lead.lost_reason}"</span>}
+                      {lead.last_called && <span>Last: {new Date(lead.last_called).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                    </div>
+                  </div>
+                  <button
+                    style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 8, padding: '7px 16px', fontFamily: 'DM Mono, monospace', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    onClick={() => handleResetAndCall(lead.id)}
+                  >
+                    Reset & Call
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {selectedLead && <LeadModal lead={selectedLead} onClose={() => setSelectedLead(null)} onSave={handleSave} />}
     </div>
   );

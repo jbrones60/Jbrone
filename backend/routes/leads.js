@@ -88,6 +88,46 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+router.get('/reengagement', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT * FROM leads
+      WHERE status = 'Not Interested'
+      AND last_called < NOW() - INTERVAL '60 days'
+      ORDER BY last_called ASC
+    `);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/', auth, async (req, res) => {
+  const { name, type, address, phone, website, category } = req.body;
+  if (!name || !category) return res.status(400).json({ error: 'name and category are required' });
+
+  const normPhone = normalisePhone(phone);
+  if (normPhone) {
+    const { rows: existing } = await pool.query(
+      `SELECT id, name FROM leads WHERE RIGHT(REGEXP_REPLACE(COALESCE(phone,''), '[^0-9]', '', 'g'), 10) = $1`,
+      [normPhone]
+    );
+    if (existing[0])
+      return res.status(409).json({ error: `A lead with this phone number already exists: ${existing[0].name}` });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO leads (name, type, address, phone, website, category)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [name, type || null, address || null, phone || null, website || null, category]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.post('/:id/logs', auth, async (req, res) => {
   const { id } = req.params;
   const { status_set, notes } = req.body;
@@ -140,27 +180,24 @@ router.get('/backup', auth, async (req, res) => {
 
 router.patch('/:id', auth, async (req, res) => {
   const { id } = req.params;
-  const { status, assigned_to, priority, notes, follow_up_date, lost_reason } = req.body;
+  const ALLOWED = ['status', 'assigned_to', 'priority', 'notes', 'follow_up_date', 'lost_reason'];
+  const updates = Object.fromEntries(ALLOWED.filter(k => k in req.body).map(k => [k, req.body[k]]));
 
-  if (status !== undefined && !VALID_STATUSES.includes(status))
+  if (!Object.keys(updates).length) return res.status(400).json({ error: 'No fields to update' });
+
+  if ('status' in updates && updates.status !== null && !VALID_STATUSES.includes(updates.status))
     return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
-  if (priority !== undefined && !VALID_PRIORITIES.includes(priority))
+  if ('priority' in updates && updates.priority !== null && !VALID_PRIORITIES.includes(updates.priority))
     return res.status(400).json({ error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}` });
-  if (lost_reason != null && !VALID_LOST_REASONS.includes(lost_reason))
+  if ('lost_reason' in updates && updates.lost_reason !== null && !VALID_LOST_REASONS.includes(updates.lost_reason))
     return res.status(400).json({ error: `Invalid lost_reason. Must be one of: ${VALID_LOST_REASONS.join(', ')}` });
 
+  const keys = Object.keys(updates);
+  const setClauses = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
   try {
     const { rows } = await pool.query(
-      `UPDATE leads SET
-        status = COALESCE($1, status),
-        assigned_to = COALESCE($2, assigned_to),
-        priority = COALESCE($3, priority),
-        notes = COALESCE($4, notes),
-        follow_up_date = COALESCE($5, follow_up_date),
-        lost_reason = COALESCE($7, lost_reason),
-        last_called = NOW()
-      WHERE id = $6 RETURNING *`,
-      [status, assigned_to, priority, notes, follow_up_date || null, id, lost_reason ?? null]
+      `UPDATE leads SET ${setClauses}, last_called = NOW() WHERE id = $${keys.length + 1} RETURNING *`,
+      [...keys.map(k => updates[k]), id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Lead not found' });
     res.json(rows[0]);

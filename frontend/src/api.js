@@ -24,6 +24,12 @@ export async function getStats() {
   return res.json();
 }
 
+export async function getReengagementLeads() {
+  const res = await fetch(`${BASE}/api/v1/leads/reengagement`, { headers: headers() });
+  if (!res.ok) throw new Error('Failed to fetch reengagement leads');
+  return res.json();
+}
+
 export async function addCallLog(leadId, data) {
   const res = await fetch(`${BASE}/api/v1/leads/${leadId}/logs`, { method: 'POST', headers: headers(), body: JSON.stringify(data) });
   if (!res.ok) throw new Error('Failed to add call log');
