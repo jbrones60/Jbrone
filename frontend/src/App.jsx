@@ -12,6 +12,22 @@ const PRIORITIES = ['high', 'medium', 'low'];
 const STATUS_QUICK = ['Not Called', 'Interested', 'Follow Up', 'Converted'];
 const EMPTY_FILTERS = { search: '', category: '', assigned_to: '', status: '', priority: '', website: '' };
 
+const SCRIPTS = {
+  'schools': "Hi, am I speaking with the principal or the person who handles admissions?\n\nHi [name], I'm calling from our agency in Vijayawada. We build websites for schools — I noticed your school doesn't have one online yet. I have 2 minutes — can I quickly show you what we did for a school similar to yours?",
+  'Real Estate': "Hi, is this [business name]?\n\nHi, I'm calling from our agency. We build websites for real estate businesses in Vijayawada that help you get property enquiries directly from Google. Do you currently have a website that's bringing you leads?",
+  'interior designs': "Hi, am I speaking with the owner?\n\nHi, I'm calling from our agency. We design websites for interior designers — mostly to show your portfolio and get client enquiries online. Are you currently getting clients from your website or mostly through referrals?",
+  'CA': "Hi, is this [firm name]?\n\nHi, I'm calling from our agency in Vijayawada. We build professional websites for CA firms that help clients find you on Google. Most CA firms we speak to are getting zero online enquiries — is that the case for you too?",
+  'law': "Hi, am I speaking with the advocate or the office manager?\n\nHi, I'm from our agency. We build websites for law firms in Vijayawada. A good website helps clients find you when they search for lawyers locally on Google. Do you currently have one?",
+};
+
+const PITCH_NOTES = {
+  'schools': "Ask about admissions season. Mention mobile-first design. Reference how parents search for schools on Google. Highlight low maintenance — they don't need to manage it.",
+  'Real Estate': "Ask if they get enquiries online currently. Mention Google Maps integration. Highlight property listing pages. Reference competitors who have sites.",
+  'interior designs': "Focus on portfolio showcase. Mention Instagram-style gallery pages. Ask if clients find them online or only via referrals. Highlight before/after project pages.",
+  'CA': "Mention GST filing season — clients search for CAs online. Highlight credibility and trust that a website builds. Reference how competitors show up on Google.",
+  'law': "Ask what type of cases they handle. Mention local SEO — people search 'lawyer in Vijayawada'. Highlight consultation booking page. Keep pitch short — lawyers are busy.",
+};
+
 const CATEGORY_COLORS = {
   'schools': '#3b82f6',
   'Real Estate': '#22c55e',
@@ -47,6 +63,11 @@ const s = {
   quickLogRow: { display: 'flex', gap: 6, flexWrap: 'wrap' },
   quickBtn: (color) => ({ background: color + '18', color, border: `1px solid ${color}33`, borderRadius: 8, padding: '6px 11px', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, whiteSpace: 'nowrap' }),
   quickLogLabel: { fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#475569', marginBottom: 6 },
+  collapsePanel: { border: '1px solid #1e293b', borderRadius: 8, overflow: 'hidden', background: '#0a0f1a' },
+  collapseHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 14px', cursor: 'pointer', userSelect: 'none' },
+  collapseTitle: { fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#64748b', fontWeight: 600, letterSpacing: '0.04em' },
+  collapseChevron: (open) => ({ color: '#475569', fontSize: 10, display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }),
+  collapseBody: { padding: '0 14px 12px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#94a3b8', lineHeight: 1.75, whiteSpace: 'pre-wrap' },
 };
 
 function LeadModal({ lead, onClose, onSave }) {
@@ -58,6 +79,8 @@ function LeadModal({ lead, onClose, onSave }) {
   });
   const [saving, setSaving] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [scriptOpen, setScriptOpen] = useState(false);
+  const [pitchOpen, setPitchOpen] = useState(false);
   const dateRef = useRef(null);
 
   useEffect(() => {
@@ -160,6 +183,29 @@ function LeadModal({ lead, onClose, onSave }) {
 
         {/* Bottom: editable fields */}
         <div style={{ padding: '20px 28px', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Opening Script panel */}
+          <div style={s.collapsePanel}>
+            <div style={s.collapseHeader} onClick={() => setScriptOpen(o => !o)}>
+              <span style={s.collapseTitle}>Opening Script</span>
+              <span style={s.collapseChevron(scriptOpen)}>▶</span>
+            </div>
+            {scriptOpen && (
+              <div style={s.collapseBody}>{SCRIPTS[lead.category] || 'No script available for this category.'}</div>
+            )}
+          </div>
+
+          {/* Pitch Notes panel */}
+          <div style={s.collapsePanel}>
+            <div style={s.collapseHeader} onClick={() => setPitchOpen(o => !o)}>
+              <span style={s.collapseTitle}>Pitch Notes</span>
+              <span style={s.collapseChevron(pitchOpen)}>▶</span>
+            </div>
+            {pitchOpen && (
+              <div style={s.collapseBody}>{PITCH_NOTES[lead.category] || 'No pitch notes for this category.'}</div>
+            )}
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={s.label}>Status</label>
