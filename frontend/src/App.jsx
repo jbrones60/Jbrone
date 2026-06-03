@@ -12,6 +12,14 @@ const PRIORITIES = ['high', 'medium', 'low'];
 const STATUS_QUICK = ['Not Called', 'Interested', 'Follow Up', 'Converted'];
 const EMPTY_FILTERS = { search: '', category: '', assigned_to: '', status: '', priority: '', website: '' };
 
+const CATEGORY_COLORS = {
+  'schools': '#3b82f6',
+  'Real Estate': '#22c55e',
+  'interior designs': '#a855f7',
+  'law': '#f59e0b',
+  'CA': '#ef4444',
+};
+
 const s = {
   app: { minHeight: '100vh', background: '#080c14', color: '#f1f5f9' },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 56, borderBottom: '1px solid #1e293b', background: '#111827' },
@@ -29,27 +37,28 @@ const s = {
   chip: { display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 20, padding: '3px 10px', fontFamily: 'DM Mono, monospace', fontSize: 12 },
   chipRemove: { background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: 1 },
   clearAll: { background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: 12, textDecoration: 'underline', padding: 0 },
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
-  modal: { background: '#111827', border: '1px solid #1e293b', borderRadius: 12, padding: 28, width: 480, maxHeight: '90vh', overflowY: 'auto' },
-  modalTitle: { fontFamily: 'Space Grotesk, sans-serif', fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 4 },
-  modalSub: { fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#64748b', marginBottom: 20 },
-  fieldRow: { marginBottom: 14 },
   label: { display: 'block', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#64748b', marginBottom: 5 },
   mInput: { width: '100%', background: '#080c14', border: '1px solid #1e293b', color: '#f1f5f9', borderRadius: 8, padding: '8px 10px', fontFamily: 'DM Mono, monospace', fontSize: 13, boxSizing: 'border-box' },
   mSelect: { width: '100%', background: '#080c14', border: '1px solid #1e293b', color: '#f1f5f9', borderRadius: 8, padding: '8px 10px', fontFamily: 'DM Mono, monospace', fontSize: 13 },
-  textarea: { width: '100%', background: '#080c14', border: '1px solid #1e293b', color: '#f1f5f9', borderRadius: 8, padding: '8px 10px', fontFamily: 'DM Mono, monospace', fontSize: 13, minHeight: 80, resize: 'vertical', boxSizing: 'border-box' },
-  pitch: { background: '#1e293b', borderRadius: 8, padding: '10px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#94a3b8', marginBottom: 16 },
-  btnRow: { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 },
+  textarea: { width: '100%', background: '#080c14', border: '1px solid #1e293b', color: '#f1f5f9', borderRadius: 8, padding: '8px 10px', fontFamily: 'DM Mono, monospace', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' },
+  btnRow: { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 },
   saveBtn: { background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 22px', fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
   cancelBtn: { background: 'none', color: '#64748b', border: '1px solid #1e293b', borderRadius: 8, padding: '9px 22px', fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, cursor: 'pointer' },
 };
 
 function LeadModal({ lead, onClose, onSave }) {
   const [form, setForm] = useState({
-    status: lead.status, assigned_to: lead.assigned_to, priority: lead.priority,
-    notes: lead.notes || '', follow_up_date: lead.follow_up_date ? lead.follow_up_date.split('T')[0] : '',
+    status: lead.status,
+    priority: lead.priority,
+    notes: lead.notes || '',
+    follow_up_date: lead.follow_up_date ? lead.follow_up_date.split('T')[0] : '',
   });
   const [saving, setSaving] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    requestAnimationFrame(() => setVisible(true));
+  }, []);
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
@@ -60,54 +69,106 @@ function LeadModal({ lead, onClose, onSave }) {
     finally { setSaving(false); }
   }
 
-  const pitch = lead.has_website
-    ? 'They have a website — pitch redesign, SEO audit, or performance improvement.'
-    : 'No website detected — pitch a new website build from scratch.';
+  const catColor = CATEGORY_COLORS[lead.category] || '#64748b';
+  const websiteUrl = lead.website && (lead.website.startsWith('http') ? lead.website : `https://${lead.website}`);
 
   return (
-    <div style={s.overlay} onClick={onClose}>
-      <div style={s.modal} onClick={e => e.stopPropagation()}>
-        <div style={s.modalTitle}>{lead.name}</div>
-        <div style={s.modalSub}>{lead.category} · {lead.address}</div>
-        <div style={s.pitch}> {pitch}</div>
-        <div style={s.fieldRow}>
-          <label style={s.label}>Phone</label>
-          <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 13 }}>
-            <a href={`tel:${lead.phone}`} style={{ color: '#3b82f6' }}>{lead.phone}</a>
+    <>
+      <div
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 99 }}
+      />
+      <div style={{
+        position: 'fixed', top: 0, right: 0, height: '100vh', width: 520,
+        background: '#111827', borderLeft: '1px solid #1e293b',
+        borderRadius: '12px 0 0 12px', zIndex: 100, overflowY: 'auto',
+        display: 'flex', flexDirection: 'column',
+        transform: visible ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform 0.25s ease',
+      }}>
+
+        {/* Top: read-only info */}
+        <div style={{ padding: '24px 28px 20px', borderBottom: '1px solid #1e293b' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 22, fontWeight: 700, color: '#f1f5f9', lineHeight: 1.2, flex: 1, marginRight: 12 }}>
+              {lead.name}
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18, padding: 0, lineHeight: 1 }}>✕</button>
+          </div>
+
+          <span style={{ background: catColor + '22', color: catColor, border: `1px solid ${catColor}44`, borderRadius: 20, padding: '3px 12px', fontFamily: 'DM Mono, monospace', fontSize: 12 }}>
+            {lead.category}
+          </span>
+
+          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 9 }}>
+            <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 13 }}>
+              <a href={`tel:${lead.phone}`} style={{ color: '#3b82f6', textDecoration: 'none' }}>
+                📞 {lead.phone}
+              </a>
+            </div>
+            {lead.address && (
+              <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#64748b' }}>
+                📍 {lead.address}
+              </div>
+            )}
+            {lead.has_website && websiteUrl && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#22c55e', textDecoration: 'none' }}>
+                  🌐 {lead.website}
+                </a>
+                <a
+                  href={`https://pagespeed.web.dev/analysis?url=${encodeURIComponent(websiteUrl)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#f59e0b', textDecoration: 'none', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 4, padding: '2px 8px', whiteSpace: 'nowrap' }}
+                >
+                  Check Site Score →
+                </a>
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 14, background: '#0d1117', borderRadius: 8, padding: '10px 14px', fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#64748b' }}>
+            {lead.has_website
+              ? 'They have a website — pitch redesign, SEO audit, or performance improvement.'
+              : 'No website detected — pitch a new website build from scratch.'}
           </div>
         </div>
-        <div style={s.fieldRow}>
-          <label style={s.label}>Status</label>
-          <select style={s.mSelect} value={form.status} onChange={e => set('status', e.target.value)}>
-            {STATUSES.filter(Boolean).map(st => <option key={st}>{st}</option>)}
-          </select>
-        </div>
-        <div style={s.fieldRow}>
-          <label style={s.label}>Assigned To</label>
-          <select style={s.mSelect} value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)}>
-            {MEMBERS.filter(Boolean).map(m => <option key={m}>{m}</option>)}
-          </select>
-        </div>
-        <div style={s.fieldRow}>
-          <label style={s.label}>Priority</label>
-          <select style={s.mSelect} value={form.priority} onChange={e => set('priority', e.target.value)}>
-            {PRIORITIES.map(p => <option key={p}>{p}</option>)}
-          </select>
-        </div>
-        <div style={s.fieldRow}>
-          <label style={s.label}>Follow-up Date</label>
-          <input style={s.mInput} type="date" value={form.follow_up_date} onChange={e => set('follow_up_date', e.target.value)} />
-        </div>
-        <div style={s.fieldRow}>
-          <label style={s.label}>Notes</label>
-          <textarea style={s.textarea} value={form.notes} onChange={e => set('notes', e.target.value)} />
-        </div>
-        <div style={s.btnRow}>
-          <button style={s.cancelBtn} onClick={onClose}>Cancel</button>
-          <button style={s.saveBtn} onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+
+        {/* Bottom: editable fields */}
+        <div style={{ padding: '20px 28px', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div>
+              <label style={s.label}>Status</label>
+              <select style={s.mSelect} value={form.status} onChange={e => set('status', e.target.value)}>
+                {STATUSES.filter(Boolean).map(st => <option key={st}>{st}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={s.label}>Priority</label>
+              <select style={s.mSelect} value={form.priority} onChange={e => set('priority', e.target.value)}>
+                {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label style={s.label}>Follow-up Date</label>
+            <input style={s.mInput} type="date" value={form.follow_up_date} onChange={e => set('follow_up_date', e.target.value)} />
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <label style={s.label}>Notes</label>
+            <textarea style={{ ...s.textarea, minHeight: 130 }} value={form.notes} onChange={e => set('notes', e.target.value)} />
+          </div>
+
+          <div style={s.btnRow}>
+            <button style={s.cancelBtn} onClick={onClose}>Cancel</button>
+            <button style={s.saveBtn} onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -168,7 +229,6 @@ export default function App() {
 
       {tab !== 'Stats' && (
         <div style={s.filterBar}>
-          {/* Row 1: Search + Clear All */}
           <div style={s.filterRow}>
             <input
               style={s.searchInput}
@@ -181,7 +241,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Row 2: Status quick-filter pills */}
           <div style={s.filterRow}>
             {STATUS_QUICK.map(st => (
               <button
@@ -194,7 +253,6 @@ export default function App() {
             ))}
           </div>
 
-          {/* Row 3: Category / Priority / Website — chip when active, select when not */}
           <div style={s.filterRow}>
             {filters.category ? (
               <span style={s.chip}>
@@ -233,7 +291,6 @@ export default function App() {
               </select>
             )}
 
-            {/* Chip for statuses set outside the 4 quick pills */}
             {filters.status && !STATUS_QUICK.includes(filters.status) && (
               <span style={s.chip}>
                 Status: {filters.status}
