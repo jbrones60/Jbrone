@@ -24,6 +24,18 @@ export async function getStats() {
   return res.json();
 }
 
+export async function addCallLog(leadId, data) {
+  const res = await fetch(`${BASE}/api/v1/leads/${leadId}/logs`, { method: 'POST', headers: headers(), body: JSON.stringify(data) });
+  if (!res.ok) throw new Error('Failed to add call log');
+  return res.json();
+}
+
+export async function getCallLogs(leadId) {
+  const res = await fetch(`${BASE}/api/v1/leads/${leadId}/logs`, { headers: headers() });
+  if (!res.ok) throw new Error('Failed to fetch call logs');
+  return res.json();
+}
+
 export async function exportBackup() {
   const res = await fetch(`${BASE}/api/v1/leads/backup`, { headers: headers() });
   if (!res.ok) throw new Error('Failed to export backup');

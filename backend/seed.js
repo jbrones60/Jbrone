@@ -45,6 +45,17 @@ async function seed() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS call_logs (
+      id SERIAL PRIMARY KEY,
+      lead_id INTEGER REFERENCES leads(id) ON DELETE CASCADE,
+      logged_by TEXT,
+      status_set TEXT,
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_leads_status_category ON leads (status, category);
   `);
 

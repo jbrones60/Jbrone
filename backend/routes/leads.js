@@ -82,6 +82,34 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+router.post('/:id/logs', auth, async (req, res) => {
+  const { id } = req.params;
+  const { status_set, notes } = req.body;
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO call_logs (lead_id, logged_by, status_set, notes)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [id, req.user.name, status_set || null, notes || '']
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/:id/logs', auth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM call_logs WHERE lead_id = $1 ORDER BY created_at DESC',
+      [id]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.get('/backup', auth, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM leads ORDER BY id');
