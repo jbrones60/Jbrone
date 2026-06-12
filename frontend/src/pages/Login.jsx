@@ -4,12 +4,12 @@ import { login } from '../api';
 const s = {
   page: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#080c14' },
   card: { background: '#111827', border: '1px solid #1e293b', borderRadius: 12, padding: 40, width: 360 },
-  title: { fontFamily: 'Space Grotesk, sans-serif', color: '#f1f5f9', fontSize: 24, fontWeight: 700, marginBottom: 8 },
-  sub: { color: '#64748b', fontFamily: 'DM Mono, monospace', fontSize: 13, marginBottom: 28 },
-  label: { display: 'block', color: '#94a3b8', fontFamily: 'DM Mono, monospace', fontSize: 12, marginBottom: 6 },
-  input: { width: '100%', background: '#080c14', border: '1px solid #1e293b', borderRadius: 8, padding: '10px 12px', color: '#f1f5f9', fontFamily: 'DM Mono, monospace', fontSize: 14, boxSizing: 'border-box', marginBottom: 16 },
+  title: { fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#f1f5f9', fontSize: 24, fontWeight: 700, marginBottom: 8 },
+  sub: { color: '#64748b', fontFamily: 'Inter, sans-serif', fontSize: 13, marginBottom: 28 },
+  label: { display: 'block', color: '#94a3b8', fontFamily: 'Inter, sans-serif', fontSize: 12, marginBottom: 6 },
+  input: { width: '100%', background: '#080c14', border: '1px solid #1e293b', borderRadius: 8, padding: '10px 12px', color: '#f1f5f9', fontFamily: 'Inter, sans-serif', fontSize: 14, boxSizing: 'border-box', marginBottom: 16 },
   btn: { width: '100%', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 0', fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, fontWeight: 600, cursor: 'pointer' },
-  err: { color: '#f87171', fontFamily: 'DM Mono, monospace', fontSize: 13, marginBottom: 12 },
+  err: { color: '#f87171', fontFamily: 'Inter, sans-serif', fontSize: 13, marginBottom: 12 },
 };
 
 export default function Login({ onLogin }) {
