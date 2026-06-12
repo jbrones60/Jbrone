@@ -165,6 +165,109 @@ function CollapsePanel({ title, children, defaultOpen = false }) {
   );
 }
 
+const PRIORITY_BORDER = { high: '#f87171', medium: '#fbbf24', low: '#334155' };
+
+function BottomNav({ tab, setTab, followUpCount }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const isMore = tab === 'Kanban' || tab === 'Re-engage';
+
+  const items = [
+    {
+      name: 'Leads', activeTabs: ['Leads'],
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>,
+    },
+    {
+      name: 'Follow Up', activeTabs: ['Follow Up'], badge: followUpCount || null,
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+    },
+    {
+      name: 'Stats', activeTabs: ['Stats'],
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>,
+    },
+    {
+      name: 'More', activeTabs: ['Kanban', 'Re-engage'],
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>,
+    },
+  ];
+
+  return (
+    <>
+      {moreOpen && (
+        <>
+          <div onClick={() => setMoreOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
+          <div style={{ position: 'fixed', bottom: 56, left: 0, right: 0, background: '#111827', borderTop: '1px solid #1e293b', zIndex: 200 }}>
+            {['Kanban', 'Re-engage'].map(name => (
+              <button key={name}
+                style={{ display: 'block', width: '100%', background: tab === name ? 'rgba(59,130,246,0.08)' : 'none', border: 'none', borderBottom: '1px solid #1e293b', color: tab === name ? '#3b82f6' : '#94a3b8', padding: '15px 24px', textAlign: 'left', fontFamily: 'Inter, sans-serif', fontSize: 14, cursor: 'pointer' }}
+                onClick={() => { setTab(name); setMoreOpen(false); }}>
+                {name}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 56, background: '#111827', borderTop: '1px solid #1e293b', display: 'flex', alignItems: 'stretch', zIndex: 200 }}>
+        {items.map(item => {
+          const active = item.activeTabs.includes(tab) || (item.name === 'More' && isMore);
+          return (
+            <button key={item.name}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: active ? '#3b82f6' : '#475569', gap: 3, position: 'relative', padding: 0 }}
+              onClick={() => item.name === 'More' ? setMoreOpen(o => !o) : (setTab(item.activeTabs[0]), setMoreOpen(false))}>
+              <div style={{ position: 'relative' }}>
+                {item.icon}
+                {item.badge > 0 && (
+                  <span style={{ position: 'absolute', top: -4, right: -8, minWidth: 16, height: 16, borderRadius: 8, background: '#f87171', color: '#fff', fontFamily: 'Inter, sans-serif', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
+              </div>
+              <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 10, fontWeight: 500, letterSpacing: '0.02em' }}>{item.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function LeadCards({ leads, onSelectLead }) {
+  if (!leads.length) return (
+    <div style={{ padding: '32px 16px', textAlign: 'center', fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#334155' }}>No leads found</div>
+  );
+  return (
+    <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {leads.map(lead => {
+        const priColor = PRIORITY_BORDER[lead.priority] || '#334155';
+        const catColor = CATEGORY_COLORS[lead.category] || '#64748b';
+        const statusColor = STATUS_COLORS[lead.status] || '#94a3b8';
+        return (
+          <div key={lead.id} style={{ background: '#111827', borderLeft: `3px solid ${priColor}`, borderRadius: 8, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }} onClick={() => onSelectLead(lead)}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, color: '#f1f5f9', fontSize: 14, flex: 1, marginRight: 8 }}>{lead.name}</div>
+                <span style={{ background: statusColor + '1a', color: statusColor, border: `1px solid ${statusColor}33`, borderRadius: 20, padding: '2px 8px', fontFamily: 'Inter, sans-serif', fontSize: 11, whiteSpace: 'nowrap' }}>{lead.status}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: catColor }}>{lead.category}</span>
+                {lead.assigned_to && <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#475569' }}>{lead.assigned_to}</span>}
+              </div>
+            </div>
+            {lead.phone && (
+              <a href={`tel:${lead.phone}`}
+                onClick={e => e.stopPropagation()}
+                style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.06 6.06l.97-.97a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+              </a>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function NewLeadModal({ onClose, onSave, onToast }) {
   const [form, setForm] = useState({ name: '', phone: '', category: '', address: '', website: '' });
   const [saving, setSaving] = useState(false);
@@ -234,7 +337,7 @@ function NewLeadModal({ onClose, onSave, onToast }) {
   );
 }
 
-function LeadModal({ lead, onClose, onSave, onRemove, onToast }) {
+function LeadModal({ lead, onClose, onSave, onRemove, onToast, isMobile }) {
   const [form, setForm] = useState({
     status: lead.status,
     priority: lead.priority,
@@ -375,18 +478,12 @@ function LeadModal({ lead, onClose, onSave, onRemove, onToast }) {
         {/* Quick log buttons */}
         <div style={{ marginBottom: 14 }}>
           <div style={s.quickLogLabel}>QUICK LOG</div>
-          <div style={s.quickLogRow}>
-            <button style={s.quickBtn('#94a3b8')} onClick={() => quickLog('Called - No Answer')}>No Answer</button>
-            <button style={s.quickBtn('#22c55e')} onClick={() => quickLog('Interested')}>Interested ✓</button>
-            <button style={s.quickBtn('#f87171')} onClick={() => {
-              setLostReasonPending(true);
-              set('status', 'Not Interested');
-            }}>Not Interested</button>
-            <button style={s.quickBtn('#3b82f6')} onClick={() => {
-              set('status', 'Follow Up');
-              set('follow_up_date', daysFromToday(3));
-            }}>Follow Up (+3d)</button>
-            <button style={s.quickBtn('#f59e0b')} onClick={() => quickLog('Converted')}>Converted 🎉</button>
+          <div style={isMobile ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 } : s.quickLogRow}>
+            <button style={{ ...s.quickBtn('#94a3b8'), ...(isMobile && { minHeight: 44 }) }} onClick={() => quickLog('Called - No Answer')}>No Answer</button>
+            <button style={{ ...s.quickBtn('#22c55e'), ...(isMobile && { minHeight: 44 }) }} onClick={() => quickLog('Interested')}>Interested ✓</button>
+            <button style={{ ...s.quickBtn('#f87171'), ...(isMobile && { minHeight: 44 }) }} onClick={() => { setLostReasonPending(true); set('status', 'Not Interested'); }}>Not Interested</button>
+            <button style={{ ...s.quickBtn('#3b82f6'), ...(isMobile && { minHeight: 44 }) }} onClick={() => { set('status', 'Follow Up'); set('follow_up_date', daysFromToday(3)); }}>Follow Up (+3d)</button>
+            <button style={{ ...s.quickBtn('#f59e0b'), ...(isMobile && { minHeight: 44, gridColumn: 'span 2' }) }} onClick={() => quickLog('Converted')}>Converted 🎉</button>
           </div>
         </div>
 
@@ -523,7 +620,8 @@ function LeadModal({ lead, onClose, onSave, onRemove, onToast }) {
 
 export default function App() {
   const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem('user')); } catch { return null; } });
-  const [tab, setTab] = useState('Table');
+  const [tab, setTab] = useState(() => window.innerWidth < 768 ? 'Leads' : 'Table');
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [leads, setLeads] = useState([]);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedLead, setSelectedLead] = useState(null);
@@ -535,6 +633,7 @@ export default function App() {
   const [followUpCount, setFollowUpCount] = useState(0);
   const [toast, setToast] = useState(null);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
+  const [showFilterDrawer, setShowFilterDrawer] = useState(false);
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
 
@@ -573,6 +672,16 @@ export default function App() {
       setFollowUpCount(data.length);
     }).catch(console.error).finally(() => setFollowUpLoading(false));
   }, [tab]);
+
+  useEffect(() => {
+    const handler = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setTab(t => t === 'Table' ? 'Leads' : t);
+    };
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   function setFilter(k, v) { setFilters(f => ({ ...f, [k]: v })); }
 
@@ -615,7 +724,7 @@ export default function App() {
   if (!user) return <Login onLogin={u => setUser(u)} />;
 
   const TABS = [
-    { name: 'Table' },
+    isMobile ? { name: 'Leads' } : { name: 'Table' },
     { name: 'Follow Up', badge: followUpCount > 0 ? followUpCount : null, badgeColor: '#f87171' },
     { name: 'Kanban' },
     { name: 'Stats' },
@@ -623,7 +732,7 @@ export default function App() {
   ];
 
   return (
-    <div style={s.app}>
+    <div style={{ ...s.app, paddingBottom: isMobile ? 64 : 0 }}>
       <div style={s.header}>
         <div style={s.logo}>Agency CRM</div>
         <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -633,16 +742,18 @@ export default function App() {
         </div>
       </div>
 
-      <div style={s.tabs}>
-        {TABS.map(t => (
-          <button key={t.name} style={s.tab(tab === t.name)} onClick={() => setTab(t.name)}>
-            {t.name}
-            {t.badge ? <span style={s.tabBadge(t.badgeColor)}>{t.badge > 99 ? '99+' : t.badge}</span> : null}
-          </button>
-        ))}
-      </div>
+      {!isMobile && (
+        <div style={s.tabs}>
+          {TABS.map(t => (
+            <button key={t.name} style={s.tab(tab === t.name)} onClick={() => setTab(t.name)}>
+              {t.name}
+              {t.badge ? <span style={s.tabBadge(t.badgeColor)}>{t.badge > 99 ? '99+' : t.badge}</span> : null}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {tab !== 'Stats' && tab !== 'Re-engage' && tab !== 'Follow Up' && (
+      {!isMobile && tab !== 'Stats' && tab !== 'Re-engage' && tab !== 'Follow Up' && (
         <div style={s.filterBar}>
           <div style={s.filterRow}>
             <input
@@ -701,7 +812,40 @@ export default function App() {
         </div>
       )}
 
+      {isMobile && tab !== 'Stats' && tab !== 'Re-engage' && tab !== 'Follow Up' && (
+        <div style={{ display: 'flex', alignItems: 'center', background: '#0d1117', borderBottom: '1px solid #1e293b' }}>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '8px 12px', flex: 1, scrollbarWidth: 'none' }}>
+            {[
+              { label: 'Interested', key: 'status',   value: 'Interested', color: '#22c55e' },
+              { label: 'Follow Up',  key: 'status',   value: 'Follow Up',  color: '#3b82f6' },
+              { label: 'High',       key: 'priority', value: 'high',       color: '#f87171' },
+            ].map(f => {
+              const active = filters[f.key] === f.value;
+              return (
+                <button key={f.label} onClick={() => setFilter(f.key, active ? '' : f.value)}
+                  style={{ flexShrink: 0, background: active ? f.color + '22' : '#111827', color: active ? f.color : '#64748b', border: `1px solid ${active ? f.color + '55' : '#1e293b'}`, borderRadius: 20, padding: '5px 14px', fontFamily: 'Inter, sans-serif', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  {f.label}
+                </button>
+              );
+            })}
+            {hasActiveFilters && (
+              <button onClick={() => setFilters(EMPTY_FILTERS)}
+                style={{ flexShrink: 0, background: 'none', color: '#475569', border: '1px solid #1e293b', borderRadius: 20, padding: '5px 12px', fontFamily: 'Inter, sans-serif', fontSize: 12, cursor: 'pointer' }}>
+                ✕ Clear
+              </button>
+            )}
+          </div>
+          <button onClick={() => setShowFilterDrawer(true)}
+            style={{ flexShrink: 0, background: hasActiveFilters ? 'rgba(59,130,246,0.12)' : 'none', border: 'none', borderLeft: '1px solid #1e293b', color: hasActiveFilters ? '#3b82f6' : '#475569', padding: '0 14px', height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      )}
+
       {loading && <div style={{ padding: 24, fontFamily: 'Inter, sans-serif', color: '#64748b' }}>Loading…</div>}
+      {!loading && tab === 'Leads' && <LeadCards leads={leads} onSelectLead={setSelectedLead} />}
       {!loading && tab === 'Table' && <Table leads={leads} onSelectLead={setSelectedLead} onLeadUpdate={handleLeadUpdate} />}
       {!loading && tab === 'Kanban' && <Kanban leads={leads} onSelectLead={setSelectedLead} />}
       {tab === 'Stats' && <Stats />}
@@ -777,9 +921,55 @@ export default function App() {
         </div>
       )}
 
+      {showFilterDrawer && (
+        <>
+          <div onClick={() => setShowFilterDrawer(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 299 }} />
+          <div style={{ position: 'fixed', bottom: 56, left: 0, right: 0, background: '#0d1117', borderTop: '1px solid #1e293b', borderRadius: '16px 16px 0 0', zIndex: 300, padding: '0 0 8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 10px' }}>
+              <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: 15, color: '#f1f5f9' }}>Filters</span>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                {hasActiveFilters && <button onClick={() => setFilters(EMPTY_FILTERS)} style={{ background: 'none', border: 'none', color: '#475569', fontFamily: 'Inter, sans-serif', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Clear all</button>}
+                <button onClick={() => setShowFilterDrawer(false)} style={{ background: 'none', border: 'none', color: '#475569', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
+              </div>
+            </div>
+            <div style={{ padding: '0 12px 4px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input style={{ ...s.searchInput, width: '100%', boxSizing: 'border-box' }} placeholder="Search name or phone…" value={filters.search} onChange={e => setFilter('search', e.target.value)} />
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {STATUS_QUICK.map(st => (
+                  <button key={st} style={s.quickPill(filters.status === st)} onClick={() => setFilter('status', filters.status === st ? '' : st)}>{st}</button>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <select style={s.filterSelect} value={filters.category} onChange={e => setFilter('category', e.target.value)}>
+                  <option value="">Category</option>
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select style={s.filterSelect} value={filters.assigned_to} onChange={e => setFilter('assigned_to', e.target.value)}>
+                  <option value="">Agent</option>
+                  {MEMBERS.filter(Boolean).map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+                <select style={s.filterSelect} value={filters.priority} onChange={e => setFilter('priority', e.target.value)}>
+                  <option value="">Priority</option>
+                  {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <select style={s.filterSelect} value={filters.website} onChange={e => setFilter('website', e.target.value)}>
+                  <option value="">Website</option>
+                  <option value="has">Has Website</option>
+                  <option value="none">No Website</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button style={{ ...s.saveBtn, flex: 1, textAlign: 'center' }} onClick={() => setShowFilterDrawer(false)}>Apply</button>
+                <button style={{ ...s.saveBtn, background: '#1e293b', color: '#f1f5f9' }} onClick={() => { setNewLeadOpen(true); setShowFilterDrawer(false); }}>+ New Lead</button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
       {newLeadOpen && <NewLeadModal onClose={() => setNewLeadOpen(false)} onSave={handleNewLead} onToast={showToast} />}
-      {selectedLead && <LeadModal lead={selectedLead} onClose={() => setSelectedLead(null)} onSave={handleSave} onRemove={handleLeadRemove} onToast={showToast} />}
+      {selectedLead && <LeadModal lead={selectedLead} onClose={() => setSelectedLead(null)} onSave={handleSave} onRemove={handleLeadRemove} onToast={showToast} isMobile={isMobile} />}
       {toast && <Toast key={toast.key} message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {isMobile && <BottomNav tab={tab} setTab={setTab} followUpCount={followUpCount} />}
     </div>
   );
 }
