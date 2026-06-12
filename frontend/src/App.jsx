@@ -3,7 +3,7 @@ import Login from './pages/Login';
 import Table from './components/Table';
 import Kanban from './components/Kanban';
 import Stats from './components/Stats';
-import { getLeads, updateLead, exportBackup, addCallLog, getCallLogs, getReengagementLeads, getFollowUpLeads, getStats, addLead, deleteLead } from './api';
+import { getLeads, updateLead, exportBackup, addCallLog, getCallLogs, getReengagementLeads, getFollowUpLeads, getStats, addLead, deleteLead, importLeads } from './api';
 
 const CATEGORIES = ['schools', 'Real Estate', 'interior designs', 'law', 'CA'];
 const MEMBERS = ['', 'Ravi', 'Priya', 'Suresh'];
@@ -265,6 +265,82 @@ function LeadCards({ leads, onSelectLead }) {
         );
       })}
     </div>
+  );
+}
+
+function ImportModal({ onClose, onToast, onImported }) {
+  const [file, setFile] = useState(null);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => { requestAnimationFrame(() => setVisible(true)); }, []);
+
+  async function handleImport() {
+    if (!file) { onToast('Select a CSV file first', 'error'); return; }
+    setLoading(true);
+    try {
+      const data = await importLeads(file);
+      setResult(data);
+      onToast(`${data.inserted} leads added, ${data.skipped} skipped`, data.inserted > 0 ? 'success' : 'warn');
+      onImported();
+    } catch (e) {
+      onToast(e.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, opacity: visible ? 1 : 0, transition: 'opacity 0.15s' }} />
+      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, maxWidth: '100vw', background: '#0d1117', borderLeft: '1px solid #1e293b', zIndex: 101, display: 'flex', flexDirection: 'column', transform: visible ? 'translateX(0)' : 'translateX(40px)', opacity: visible ? 1 : 0, transition: 'all 0.2s ease', padding: '24px 20px 32px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 17, fontWeight: 700, color: '#f1f5f9' }}>Import CSV</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 20, padding: 4, lineHeight: 1 }}>✕</button>
+        </div>
+        <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 8, padding: '12px 14px', marginBottom: 20 }}>
+          <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#3b82f6', fontWeight: 600, marginBottom: 6 }}>REQUIRED CSV FORMAT</div>
+          <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#64748b', lineHeight: 1.8 }}>
+            <span style={{ color: '#f1f5f9' }}>name</span>, <span style={{ color: '#f1f5f9' }}>category</span>, phone, address, website<br />
+            <span style={{ fontSize: 11, color: '#475569' }}>First row must be headers. name + category are required.</span>
+          </div>
+          <div style={{ marginTop: 8, fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#475569' }}>
+            Valid categories: schools · Real Estate · interior designs · law · CA
+          </div>
+        </div>
+        <label style={{ display: 'block', background: file ? 'rgba(34,197,94,0.06)' : '#111827', border: `2px dashed ${file ? '#22c55e' : '#1e293b'}`, borderRadius: 8, padding: '20px 16px', textAlign: 'center', cursor: 'pointer', marginBottom: 20, transition: 'all 0.15s' }}>
+          <input type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { setFile(e.target.files[0] || null); setResult(null); }} />
+          {file ? (
+            <div>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#22c55e', fontWeight: 600 }}>📄 {file.name}</div>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#475569', marginTop: 4 }}>{(file.size / 1024).toFixed(1)} KB — click to change</div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#475569' }}>Click to choose a CSV file</div>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#334155', marginTop: 4 }}>.csv files only</div>
+            </div>
+          )}
+        </label>
+        {result && (
+          <div style={{ background: result.inserted > 0 ? 'rgba(34,197,94,0.06)' : 'rgba(251,191,36,0.06)', border: `1px solid ${result.inserted > 0 ? 'rgba(34,197,94,0.2)' : 'rgba(251,191,36,0.2)'}`, borderRadius: 8, padding: '12px 14px', marginBottom: 20 }}>
+            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, fontWeight: 600, color: '#f1f5f9', marginBottom: 6 }}>Import complete</div>
+            <div style={{ display: 'flex', gap: 20 }}>
+              <div><span style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 700, color: '#22c55e' }}>{result.inserted}</span><div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#475569' }}>added</div></div>
+              <div><span style={{ fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 700, color: '#f59e0b' }}>{result.skipped}</span><div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#475569' }}>skipped</div></div>
+            </div>
+            {result.skipped > 0 && <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#475569', marginTop: 8 }}>Skipped rows had duplicate phone numbers or missing name/category.</div>}
+          </div>
+        )}
+        <div style={s.btnRow}>
+          <button style={s.cancelBtn} onClick={onClose}>Close</button>
+          <button style={{ ...s.saveBtn, opacity: loading || !file ? 0.5 : 1 }} onClick={handleImport} disabled={loading || !file}>
+            {loading ? 'Importing…' : 'Import'}
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -636,6 +712,7 @@ export default function App() {
   const [followUpCount, setFollowUpCount] = useState(0);
   const [toast, setToast] = useState(null);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
@@ -774,7 +851,10 @@ export default function App() {
             {hasActiveFilters && (
               <button style={s.clearAll} onClick={() => setFilters(EMPTY_FILTERS)}>Clear All</button>
             )}
-            <button style={{ marginLeft: 'auto', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => setNewLeadOpen(true)}>+ New Lead</button>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <button style={{ background: 'none', border: '1px solid #1e293b', color: '#64748b', borderRadius: 8, padding: '6px 14px', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => setImportOpen(true)}>↑ Import CSV</button>
+              <button style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => setNewLeadOpen(true)}>+ New Lead</button>
+            </div>
           </div>
           <div style={s.filterRow}>
             {STATUS_QUICK.map(st => (
@@ -970,11 +1050,13 @@ export default function App() {
               <div style={{ display: 'flex', gap: 8 }}>
                 <button style={{ ...s.saveBtn, flex: 1, textAlign: 'center' }} onClick={() => setShowFilterDrawer(false)}>Apply</button>
                 <button style={{ ...s.saveBtn, background: '#1e293b', color: '#f1f5f9' }} onClick={() => { setNewLeadOpen(true); setShowFilterDrawer(false); }}>+ New Lead</button>
+                <button style={{ ...s.saveBtn, background: '#1e293b', color: '#64748b' }} onClick={() => { setImportOpen(true); setShowFilterDrawer(false); }}>↑ CSV</button>
               </div>
             </div>
           </div>
         </>
       )}
+      {importOpen && <ImportModal onClose={() => setImportOpen(false)} onToast={showToast} onImported={() => { setPage(1); setFilters(EMPTY_FILTERS); }} />}
       {newLeadOpen && <NewLeadModal onClose={() => setNewLeadOpen(false)} onSave={handleNewLead} onToast={showToast} />}
       {selectedLead && <LeadModal lead={selectedLead} onClose={() => setSelectedLead(null)} onSave={handleSave} onRemove={handleLeadRemove} onToast={showToast} isMobile={isMobile} />}
       {toast && <Toast key={toast.key} message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
