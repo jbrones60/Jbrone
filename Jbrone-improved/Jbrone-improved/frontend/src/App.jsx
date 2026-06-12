@@ -390,6 +390,7 @@ function LeadModal({ lead, onClose, onSave, onRemove, onToast, isMobile }) {
 
   function save(overrides = {}) {
     const finalData = { ...form, ...overrides };
+    if (finalData.follow_up_date === '') finalData.follow_up_date = null;
     const durSec = timer.running ? timer.stop() : null;
     const logEntry = (finalData.status !== lead.status || finalData.notes !== (lead.notes || ''))
       ? { status_set: finalData.status, notes: finalData.notes, duration_seconds: durSec }
@@ -623,6 +624,9 @@ export default function App() {
   const [tab, setTab] = useState(() => window.innerWidth < 768 ? 'Leads' : 'Table');
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [leads, setLeads] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedLead, setSelectedLead] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -652,11 +656,18 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     setLoading(true);
-    getLeads(Object.fromEntries(Object.entries(filters).filter(([, v]) => v)))
-      .then(data => setLeads(data.leads ?? data))
+    const params = { ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page };
+    getLeads(params)
+      .then(data => {
+        setLeads(data.leads ?? data);
+        setTotalLeads(data.total ?? (data.leads ?? data).length);
+        setTotalPages(data.pages ?? 1);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [user, filters]);
+  }, [user, filters, page]);
+
+  function setFilter(k, v) { setFilters(f => ({ ...f, [k]: v })); setPage(1); }
 
   useEffect(() => {
     if (tab !== 'Re-engage') return;
@@ -683,7 +694,6 @@ export default function App() {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  function setFilter(k, v) { setFilters(f => ({ ...f, [k]: v })); }
 
   async function handleResetAndCall(id) {
     await updateLead(id, { status: 'Not Called', lost_reason: null, follow_up_date: null });
@@ -846,7 +856,7 @@ export default function App() {
 
       {loading && <div style={{ padding: 24, fontFamily: 'Inter, sans-serif', color: '#64748b' }}>Loading…</div>}
       {!loading && tab === 'Leads' && <LeadCards leads={leads} onSelectLead={setSelectedLead} />}
-      {!loading && tab === 'Table' && <Table leads={leads} onSelectLead={setSelectedLead} onLeadUpdate={handleLeadUpdate} />}
+      {!loading && tab === 'Table' && <Table leads={leads} onSelectLead={setSelectedLead} onLeadUpdate={handleLeadUpdate} page={page} pages={totalPages} total={totalLeads} onPageChange={setPage} />}
       {!loading && tab === 'Kanban' && <Kanban leads={leads} onSelectLead={setSelectedLead} />}
       {tab === 'Stats' && <Stats />}
 

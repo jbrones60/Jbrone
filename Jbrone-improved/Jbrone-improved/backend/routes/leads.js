@@ -332,6 +332,7 @@ router.patch('/:id', auth, async (req, res) => {
     return res.status(400).json({ error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}` });
   if ('lost_reason' in updates && updates.lost_reason !== null && !VALID_LOST_REASONS.includes(updates.lost_reason))
     return res.status(400).json({ error: `Invalid lost_reason. Must be one of: ${VALID_LOST_REASONS.join(', ')}` });
+  if ('follow_up_date' in updates && updates.follow_up_date === '') updates.follow_up_date = null;
 
   const keys = Object.keys(updates);
   const setClauses = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
@@ -343,6 +344,7 @@ router.patch('/:id', auth, async (req, res) => {
     if (!rows[0]) return res.status(404).json({ error: 'Lead not found' });
     res.json(rows[0]);
   } catch (err) {
+    console.error('PATCH /leads/:id error:', err.message);
     res.status(500).json({ error: 'Server error' });
   }
 });
