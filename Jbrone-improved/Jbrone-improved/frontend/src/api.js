@@ -65,3 +65,28 @@ export async function updateLead(id, data) {
   if (!res.ok) throw new Error('Failed to update lead');
   return res.json();
 }
+
+export async function addLead(data) {
+  const res = await fetch(`${BASE}/api/v1/leads`, { method: 'POST', headers: headers(), body: JSON.stringify(data) });
+  if (!res.ok) throw new Error((await res.json()).error || 'Failed to add lead');
+  return res.json();
+}
+
+export async function deleteLead(id) {
+  const res = await fetch(`${BASE}/api/v1/leads/${id}`, { method: 'DELETE', headers: headers() });
+  if (!res.ok) throw new Error('Failed to archive lead');
+  return res.json();
+}
+
+export async function importLeads(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${BASE}/api/v1/leads/import`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!res.ok) throw new Error((await res.json()).error || 'Import failed');
+  return res.json();
+}

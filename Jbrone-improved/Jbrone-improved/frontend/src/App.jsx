@@ -3,7 +3,7 @@ import Login from './pages/Login';
 import Table from './components/Table';
 import Kanban from './components/Kanban';
 import Stats from './components/Stats';
-import { getLeads, updateLead, exportBackup, addCallLog, getCallLogs, getReengagementLeads, getFollowUpLeads, getStats } from './api';
+import { getLeads, updateLead, exportBackup, addCallLog, getCallLogs, getReengagementLeads, getFollowUpLeads, getStats, addLead, deleteLead } from './api';
 
 const CATEGORIES = ['schools', 'Real Estate', 'interior designs', 'law', 'CA'];
 const MEMBERS = ['', 'Ravi', 'Priya', 'Suresh'];
@@ -165,7 +165,76 @@ function CollapsePanel({ title, children, defaultOpen = false }) {
   );
 }
 
-function LeadModal({ lead, onClose, onSave, onToast }) {
+function NewLeadModal({ onClose, onSave, onToast }) {
+  const [form, setForm] = useState({ name: '', phone: '', category: '', address: '', website: '' });
+  const [saving, setSaving] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => { requestAnimationFrame(() => setVisible(true)); }, []);
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function handleSubmit() {
+    if (!form.name.trim()) { onToast('Name is required', 'error'); return; }
+    if (!form.category) { onToast('Category is required', 'error'); return; }
+    setSaving(true);
+    try {
+      const lead = await addLead({ ...form, name: form.name.trim() });
+      onSave(lead);
+      onToast('Lead added', 'success');
+      onClose();
+    } catch (e) {
+      onToast(e.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, opacity: visible ? 1 : 0, transition: 'opacity 0.15s' }} />
+      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, maxWidth: '100vw', background: '#0d1117', borderLeft: '1px solid #1e293b', zIndex: 101, display: 'flex', flexDirection: 'column', transform: visible ? 'translateX(0)' : 'translateX(40px)', opacity: visible ? 1 : 0, transition: 'all 0.2s ease', padding: '24px 20px 32px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 17, fontWeight: 700, color: '#f1f5f9' }}>New Lead</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 20, padding: 4, lineHeight: 1 }}>✕</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={s.label}>NAME *</label>
+            <input style={s.mInput} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Business name" autoFocus />
+          </div>
+          <div>
+            <label style={s.label}>CATEGORY *</label>
+            <select style={s.mSelect} value={form.category} onChange={e => set('category', e.target.value)}>
+              <option value="">Select category…</option>
+              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={s.label}>PHONE</label>
+            <input style={s.mInput} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+91 XXXXX XXXXX" type="tel" />
+          </div>
+          <div>
+            <label style={s.label}>ADDRESS</label>
+            <input style={s.mInput} value={form.address} onChange={e => set('address', e.target.value)} placeholder="Area, City" />
+          </div>
+          <div>
+            <label style={s.label}>WEBSITE</label>
+            <input style={s.mInput} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://…" type="url" />
+          </div>
+        </div>
+        <div style={{ ...s.btnRow, marginTop: 24 }}>
+          <button style={s.cancelBtn} onClick={onClose}>Cancel</button>
+          <button style={{ ...s.saveBtn, opacity: saving ? 0.6 : 1 }} onClick={handleSubmit} disabled={saving}>
+            {saving ? 'Adding…' : 'Add Lead'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function LeadModal({ lead, onClose, onSave, onRemove, onToast }) {
   const [form, setForm] = useState({
     status: lead.status,
     priority: lead.priority,
@@ -244,6 +313,17 @@ function LeadModal({ lead, onClose, onSave, onToast }) {
     }
   }
 
+  async function handleArchive() {
+    try {
+      await deleteLead(lead.id);
+      onToast('Lead archived', 'warn');
+      onRemove(lead.id);
+      onClose();
+    } catch {
+      onToast('Failed to archive', 'error');
+    }
+  }
+
   const catColor = CATEGORY_COLORS[lead.category] || '#64748b';
   const statusColor = STATUS_COLORS[lead.status] || '#64748b';
 
@@ -264,7 +344,10 @@ function LeadModal({ lead, onClose, onSave, onToast }) {
               {lead.address && <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#475569' }}>📍 {lead.address}</span>}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 20, padding: 4, lineHeight: 1 }}>✕</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={handleArchive} style={{ background: 'none', border: '1px solid rgba(248,113,113,0.25)', color: '#f87171', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontSize: 11 }}>Archive</button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 20, padding: 4, lineHeight: 1 }}>✕</button>
+          </div>
         </div>
 
         {/* Phone + Call action */}
@@ -451,6 +534,7 @@ export default function App() {
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [followUpCount, setFollowUpCount] = useState(0);
   const [toast, setToast] = useState(null);
+  const [newLeadOpen, setNewLeadOpen] = useState(false);
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
 
@@ -518,6 +602,16 @@ export default function App() {
     return updated;
   }
 
+  function handleNewLead(lead) {
+    setLeads(ls => [lead, ...ls]);
+  }
+
+  function handleLeadRemove(id) {
+    setLeads(ls => ls.filter(l => l.id !== id));
+    setFollowUpLeads(ls => ls.filter(l => l.id !== id));
+    setReengagementLeads(ls => ls.filter(l => l.id !== id));
+  }
+
   if (!user) return <Login onLogin={u => setUser(u)} />;
 
   const TABS = [
@@ -560,6 +654,7 @@ export default function App() {
             {hasActiveFilters && (
               <button style={s.clearAll} onClick={() => setFilters(EMPTY_FILTERS)}>Clear All</button>
             )}
+            <button style={{ marginLeft: 'auto', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => setNewLeadOpen(true)}>+ New Lead</button>
           </div>
           <div style={s.filterRow}>
             {STATUS_QUICK.map(st => (
@@ -682,7 +777,8 @@ export default function App() {
         </div>
       )}
 
-      {selectedLead && <LeadModal lead={selectedLead} onClose={() => setSelectedLead(null)} onSave={handleSave} onToast={showToast} />}
+      {newLeadOpen && <NewLeadModal onClose={() => setNewLeadOpen(false)} onSave={handleNewLead} onToast={showToast} />}
+      {selectedLead && <LeadModal lead={selectedLead} onClose={() => setSelectedLead(null)} onSave={handleSave} onRemove={handleLeadRemove} onToast={showToast} />}
       {toast && <Toast key={toast.key} message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
