@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { updateLead } from '../api';
 
 const PAGE_SIZE = 30;
@@ -46,11 +45,8 @@ function getFollowUpBadge(dateStr) {
   return { label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), color: '#94a3b8' };
 }
 
-export default function Table({ leads, onSelectLead, onLeadUpdate }) {
-  const [page, setPage] = useState(1);
-  const total = leads.length;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const slice = leads.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+export default function Table({ leads, onSelectLead, onLeadUpdate, page = 1, pages = 1, total = 0, onPageChange }) {
+  const slice = leads;
 
   async function handleInlineChange(lead, field, value) {
     try {
@@ -124,9 +120,9 @@ export default function Table({ leads, onSelectLead, onLeadUpdate }) {
       </table>
       <div style={s.pager}>
         <span>{total} leads</span>
-        <button style={s.btn(false)} disabled={page === 1} onClick={() => setPage(p => p - 1)}>←</button>
+        <button style={s.btn(false)} disabled={page === 1} onClick={() => onPageChange(p => p - 1)}>←</button>
         <span>{page} / {pages}</span>
-        <button style={s.btn(false)} disabled={page === pages} onClick={() => setPage(p => p + 1)}>→</button>
+        <button style={s.btn(false)} disabled={page === pages} onClick={() => onPageChange(p => p + 1)}>→</button>
       </div>
     </div>
   );
